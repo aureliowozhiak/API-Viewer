@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .api-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .result-container {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        #cep-input {
+            font-size: 1.2rem;
+            padding: 15px;
+            height: auto;
+        }
+        .cep-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .result-tabs {
+            margin-top: 20px;
+        }
+        .table-container {
+            margin-top: 20px;
+        }
+        .table th {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <h1 class="text-center mb-5">API Viewer</h1>
+        
+        <div class="api-container">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Selecione uma API para consultar</h5>
+                    
+                    <div class="input-group mb-3">
+                        <select class="form-select" id="api-select">
+                            <option value="">Escolha uma API...</option>
+                            {% for api_id, api in apis.items() %}
+                            <option value="{{ api_id }}">{{ api.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="cep-input-container" class="cep-container" style="display: none;">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">CEP</span>
+                            <input type="text" class="form-control" id="cep-input" placeholder="00000-000" maxlength="9">
+                        </div>
+                        <small class="text-muted">Digite o CEP no formato: 00000-000</small>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="fetchApi()" id="consult-button" disabled>
+                        Consultar
+                    </button>
+                    
+                    <div class="result-container" id="result-container">
+                        <!-- Results will be displayed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const apiSelect = document.getElementById('api-select');
+        const cepInputContainer = document.getElementById('cep-input-container');
+        const consultButton = document.getElementById('consult-button');
+        const resultContainer = document.getElementById('result-container');
+        const cepInput = document.getElementById('cep-input');
+
+        // CEP input mask
+        cepInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 5) {
+                value = value.substring(0, 5) + '-' + value.substring(5, 8);
+            }
+            e.target.value = value;
+        });
+
+        apiSelect.addEventListener('change', function() {
+            const selectedApi = this.value;
+            consultButton.disabled = !selectedApi;
+            
+            // Show/hide CEP input based on selection
+            if (selectedApi === 'cep') {
+                cepInputContainer.style.display = 'block';
+                cepInput.focus();
+            } else {
+                cepInputContainer.style.display = 'none';
+            }
+            
+            // Clear previous results
+            resultContainer.innerHTML = '';
+        });
+
+        function createTableFromData(data) {
+            let table = '<div class="table-responsive"><table class="table table-striped table-bordered">';
+            
+            // Create table header
+            table += '<thead><tr>';
+            Object.keys(data).forEach(key => {
+                table += `<th>${key}</th>`;
+            });
+            table += '</tr></thead>';
+            
+            // Create table body
+            table += '<tbody><tr>';
+            Object.values(data).forEach(value => {
+                table += `<td>${value || '-'}</td>`;
+            });
+            table += '</tr></tbody>';
+            
+            table += '</table></div>';
+            return table;
+        }
+
+        function fetchApi() {
+            const selectedApi = apiSelect.value;
+            if (!selectedApi) return;
+
+            let url = `/api/${selectedApi}`;
+            
+            if (selectedApi === 'cep') {
+                const cep = document.getElementById('cep-input').value.replace(/\D/g, '');
+                if (cep.length !== 8) {
+                    alert('Por favor, digite um CEP válido no formato: 00000-000');
+                    return;
+                }
+                url += `?cep=${cep}`;
+            }
+            
+            // Show loading state
+            resultContainer.innerHTML = '<div class="text-center">Carregando...</div>';
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    // Create tabs for different views
+                    const resultHtml = `
+                        <div class="result-tabs">
+                            <ul class="nav nav-tabs" id="resultTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="table-tab" data-bs-toggle="tab" data-bs-target="#table-view" type="button" role="tab">Visualização em Tabela</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json-view" type="button" role="tab">JSON Bruto</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content" id="resultTabContent">
+                                <div class="tab-pane fade show active" id="table-view" role="tabpanel">
+                                    ${createTableFromData(data)}
+                                </div>
+                                <div class="tab-pane fade" id="json-view" role="tabpanel">
+                                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    resultContainer.innerHTML = resultHtml;
+                })
+                .catch(error => {
+                    resultContainer.innerHTML = `<div class="alert alert-danger">Erro ao consultar a API: ${error}</div>`;
+                });
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 
