@@ -17,7 +17,7 @@ Um visualizador de APIs públicas que permite consultar diferentes serviços onl
 
 1. Clone este repositório:
 ```bash
-git clone [URL_DO_REPOSITÓRIO]
+git clone https://github.com/aureliowozhiak/API-Viewer
 cd api-viewer
 ```
 
